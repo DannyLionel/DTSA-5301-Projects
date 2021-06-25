@@ -1,0 +1,123 @@
+---
+title: "NYC_Shooting_Project"
+author: "Dhanushga Lionel"
+date: "6/21/2021"
+output: html_document
+---
+#Introduction
+This is the NYPD Shooting Incident Data project for DTSA 5301. I will be walking through the steps provided in the Week 3 of Data Science as a Field on Coursera.
+
+To start, we need to go to this site (https://catalog.data.gov/dataset) and find the NYPD Shooting Incident Data (Historic). We need to right click on the CSV button and copy the link address, to read in the data set.
+
+## Step 1: Get the packages and read in the CSV file. We will then check if the dataset is read in.
+
+```{R Get_everything_ready}
+library(tidyverse)
+library(lubridate)
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+NYPD_shooting_data <- read.csv(url_in)
+NYPD_shooting_data
+```
+
+## Step 2: Tidy and Transform your data
+Now before we tidy and clean up the data we will see a summary of the dataset
+```{R Summary_before}
+summary(NYPD_shooting_data)
+```
+There are a few thing I need to clean up. 
+1. Get rid of Missing/empty data.
+2. Change OCCUR_DATE from character type to date type
+3. Take out X_COORD_CD, Y_COORD_CD, Latitude, Longitude and Lon_Lat from the data set. They are not important to the analysis I am planning.
+
+Let's start by cleaning the missing/empty data by putting NA values.
+```{R get_rid_of_NA}
+NYPD_shooting_data_NA <- NYPD_shooting_data %>%
+  mutate_all(na_if,"")
+
+NYPD_shooting_data_NA
+```
+
+Now we can see that there are no more empty cells, instead there are NA values.
+
+We will now change the OCCUR_DATE to a date type.
+```{R change_date_type}
+NYPD_Shooting_data_Date <- NYPD_shooting_data_NA
+NYPD_Shooting_data_Date$OCCUR_DATE <- mdy(NYPD_Shooting_data_Date$OCCUR_DATE)
+NYPD_Shooting_data_Date
+```
+
+We see that was a success. The OCCUR_DATE changed from a character to date type.
+
+Now we want to get rid of the columns X_COORD_CD, Y_COORD_CD, Latitude, Longitude and Lon_Lat from the data set
+```{R remove_columns_from dataset}
+NYPD_Shooting_data_remove <- NYPD_Shooting_data_Date %>% 
+  select(-c(Latitude, Longitude, X_COORD_CD, Y_COORD_CD, Lon_Lat))
+NYPD_Shooting_data_remove
+```
+
+That was a success. Now that we have removed the data we do not need, let's have a final dataset that we will be working with.
+```{R}
+NYPD_data <- NYPD_Shooting_data_remove
+NYPD_data
+```
+
+## Step 3: Add Visualizations and Analysis
+
+Now let us add some visualization to get a sense of the data. I want to see the rate of shootings by year.
+```{R}
+yearly_shooting <- NYPD_data %>%
+  mutate(YEAR = year(OCCUR_DATE)) %>%
+  group_by(YEAR) %>%
+  summarize(Shooting = n())
+yearly_shooting %>%
+  ggplot(aes(YEAR,Shooting)) +
+  geom_point(aes(color="Shooting")) +
+  geom_line(aes(color="Shooting")) +
+  theme(legend.position = "bottom") +
+  labs(title = "NYC Shooting by year", y = "# of Shooting")
+```
+
+Now I can see the number of shooting by year. I can see that the rate of shooting's is decreasing from 2006 (start of the dataset) to 2019(ish). I want more detail, so now I will visualize the number of shootings each month for the entire dataset.
+```{R}
+monthly_shooting <- NYPD_data %>%
+  group_by(MONTH = floor_date(OCCUR_DATE, "month")) %>%
+  summarize(Shooting = n()) %>%
+  ungroup()
+
+monthly_shooting %>%
+  ggplot(aes(x=MONTH, y=Shooting)) +
+  geom_line(aes(color="Shooting")) +
+  geom_point(aes(color="Shooting")) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle=90)) +
+  labs(title="NYC Shootings by Month", y="# of Shootings") +
+  scale_x_date(date_breaks="year", date_labels="%Y", minor_breaks=NULL)
+```
+
+Now we will see the shooting data by month for each borough.
+```{R}
+boro_group <- NYPD_data %>% 
+  group_by(BORO, MONTH = floor_date(OCCUR_DATE, "month")) %>%
+  summarize(Shooting = n()) %>%
+  select(BORO, MONTH, Shooting) %>%
+  ungroup()
+
+boro <- "BRONX"
+boro_group %>%
+  filter(BORO == boro) %>%
+   ggplot(aes(x=MONTH, y=Shooting)) +
+  geom_line(aes(color="Shooting")) +
+  geom_point(aes(color="Shooting")) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle=90)) +
+  labs(title= str_c("Shooting in ", boro), y="# of Shootings") +
+  scale_x_date(date_breaks="year", date_labels="%Y", minor_breaks=NULL)
+```
+
+We can see that the Bronx is following a similar pattern to entire NYC data.
+
+##Add Bias Identification
+As a person of color, I know I have a bias when it comes to whether shootings were done to a particular community, or was motivated by racist overtures. To mitigate this, I have only looked at data for the whole city, and not just a particular race/sex.
+
+##Conclusion
+This was a fun project for the Data Science as a Field. I learned a lot about R and what Data Analyst do. From this dataset, I learned that shooting is highest in the summer months. From 2012 to 2019, shooting rates were decreasing rapidly, but in 2020 there was a huge increase in shooting incidents. There may have been many factors, but the biggest may have been the COVID-19 pandemic, which triggered the increase of shootings. More research is needed for this hypothesis. 
